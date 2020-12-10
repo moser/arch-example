@@ -8,7 +8,6 @@ from typing import (
 )
 import collections as _collections
 import logging as _logging
-import pydantic.dataclasses as _pydantic_dc
 
 logger = _logging.getLogger(__name__)
 
@@ -29,15 +28,15 @@ class Query(_Message):
     pass
 
 
-T_CMD = TypeVar("T_CMD", bound="Command")
-T_QRY = TypeVar("T_QRY", bound="Query")
-T_EVT = TypeVar("T_EVT", bound="Event")
+_CmdT = TypeVar("_CmdT", bound="Command")
+_QryT = TypeVar("_QryT", bound="Query")
+_EvtT = TypeVar("_EvtT", bound="Event")
 
 
 class MessageBus:
-    _command_handlers: Dict[Type[T_CMD], Callable[[Any, T_CMD], Any]]
-    _query_handlers: Dict[Type[T_QRY], Callable[[Any, T_QRY], Any]]
-    _event_handlers: Dict[Type[T_EVT], List[Callable[[Any, T_EVT], None]]]
+    _command_handlers: Dict[Type[_CmdT], Callable[[Any, _CmdT], Any]]
+    _query_handlers: Dict[Type[_QryT], Callable[[Any, _QryT], Any]]
+    _event_handlers: Dict[Type[_EvtT], List[Callable[[Any, _EvtT], None]]]
 
     def __init__(self, uow):
         self._command_handlers = {}
@@ -46,42 +45,54 @@ class MessageBus:
         self._uow = uow
 
     def register_command_handler(
-        self, command_type: Type[T_CMD], handler: Callable[[Any, T_CMD], Any]
+        self, command_type: Type[_CmdT], handler: Callable[[Any, _CmdT], Any]
     ):
         self._command_handlers[command_type] = handler
 
     def register_query_handler(
-        self, query_type: Type[T_QRY], handler: Callable[[Any, T_QRY], Any]
+        self, query_type: Type[_QryT], handler: Callable[[Any, _QryT], Any]
     ):
         self._query_handlers[query_type] = handler
 
     def register_event_handler(
-        self, event_type: Type[T_QRY], handler: Callable[[Any, T_QRY], None]
+        self, event_type: Type[_EvtT], handler: Callable[[Any, _EvtT], None]
     ):
         self._event_handlers[event_type].append(handler)
 
     def handle(self, msg: _Message):
+        result = None
         if isinstance(msg, Command):
-            return self.handle_command(msg)
+            result = self.handle_command(msg)
         elif isinstance(msg, Query):
-            return self.handle_query(msg)
+            result = self.handle_query(msg)
         elif isinstance(msg, Event):
             self.handle_event(msg)
+        else:
+            raise UnknownMessageType
+
+        queue = list(self._uow.collect_events())
+        while queue:
+            msg = queue.pop()
+            if isinstance(msg, Event):
+                self.handle_event(msg)
+            else:
+                raise UnknownMessageType
+            queue.extend(list(self._uow.collect_events()))
+        return result
 
     def handle_command(self, command: Command):
-        handler = self._command_handlers.get(command.__class__)
+        handler = _find_handler(command, self._command_handlers)
 
-        self._uow.begin()
         try:
             result = handler(self._uow, command)
             self._uow.commit()
         except Exception:
             self._uow.rollback()
+            raise
         return result
 
     def handle_query(self, query: Query):
-        self._uow.begin()
-        handler = self._query_handlers.get(query.__class__)
+        handler = _find_handler(query, self._query_handlers)
 
         try:
             return handler(self._uow, query)
@@ -89,10 +100,34 @@ class MessageBus:
             self._uow.rollback()
 
     def handle_event(self, event: Event):
-        for handler in self._event_handlers[event.__class__]:
+        handlers = self._event_handlers[event.__class__]
+        if not handlers:
+            logger.error("No handlers for event %r", event)
+        for handler in handlers:
             try:
                 handler(self._uow, event)
+                self._uow.commit()
             except Exception:
+                self._uow.rollback()
                 logger.error(
                     "Hander %r railed to handle event %r", handler, event, exc_info=True
                 )
+
+
+def _find_handler(msg: _Message, mapping: dict):
+    handler = mapping.get(msg.__class__)
+    if not handler:
+        raise HandlerNotFound("No handler found for %r" % msg.__class__)
+    return handler
+
+
+class MessageBusException(Exception):
+    pass
+
+
+class HandlerNotFound(MessageBusException):
+    pass
+
+
+class UnknownMessageType(MessageBusException):
+    pass

@@ -4,6 +4,8 @@ import dataclasses as _dataclasses
 import datetime as _dt
 import enum as _enum
 
+import pydantic as _pydantic
+
 from tempus.common import message_bus as _message_bus
 
 
@@ -46,22 +48,19 @@ class Project:
     name: str
     hourly_rates: Dict[Level, int]
     _logs: Optional[List[TimeLog]] = _dataclasses.field(default_factory=list)
-    _events: Optional[List[_message_bus.Event]] = _dataclasses.field(
-        default_factory=list
+    events: Optional[List[_message_bus.Event]] = _dataclasses.field(
+        default_factory=list, repr=False
     )
 
-    def _ensure_hourly_rates_types(self):
-        import pydantic
+    def __hash__(self):
+        return hash(self.id)
 
-        self.hourly_rates = pydantic.parse_obj_as(Dict[Level, int], self.hourly_rates)
+    def ensure_hourly_rates_types(self):
+        self.hourly_rates = _pydantic.parse_obj_as(Dict[Level, int], self.hourly_rates)
 
     @property
     def logs(self):
         return self._logs.copy()
-
-    @property
-    def events(self):
-        return self._events.copy()
 
     def add_time_log(
         self,
@@ -81,11 +80,8 @@ class Project:
             minutes=minutes,
             billable=billable,
         )
-        print(time_log)
-        if self._logs is None:
-            self._logs = []
         self._logs.append(time_log)
-        self._events.append(
+        self.events.append(
             TimeLogCreated(id=id, project_id=self.id, minutes=minutes, amount=0)
         )
         return time_log

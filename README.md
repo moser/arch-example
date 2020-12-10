@@ -10,14 +10,25 @@ python -m venv .venv
 poetry install
 ```
 
-Run server on [localhost:8000](http://localhost:8000/timemgmt/docs)
+Setup Postgres
+```
+docker run -d \
+    --name tempus-postgres \
+    -e POSTGRES_DATABASE=tempus \
+    -e POSTGRES_USER=tempus \
+    -e POSTGRES_PASSWORD=pgpassword \
+    -p 25432:5432 \
+    postgres
+sleep 5
+docker exec tempus-postgres bash -c 'psql -U tempus -c "CREATE DATABASE tempus_test;"'
+```
 
+Run server on [localhost:8000](http://localhost:8000/timemgmt/docs)
 ```
 uvicorn --reload tempus.main:app
 ```
 
 Run tests
-
 ```
 pytest tests
 ```

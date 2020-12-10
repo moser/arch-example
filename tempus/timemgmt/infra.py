@@ -21,7 +21,9 @@ def get_message_bus(uow=None):
     if not uow:
         from . import persistence
 
-        session = create_session("postgresql://momo:momo@127.0.0.1:5111/tempus")
+        session = create_session(
+            "postgresql://tempus:pgpassword@127.0.0.1:25432/tempus"
+        )
         uow = persistence.SqlAlchemyUoW(session)
 
     message_bus = _message_bus.MessageBus(uow=uow)

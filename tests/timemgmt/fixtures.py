@@ -9,16 +9,6 @@ from tempus.timemgmt import service_layer as _service_layer
 from tempus.timemgmt import infra as _infra
 
 
-@pytest.fixture
-def mem_uow():
-    yield _persistence.InMemoryUoW()
-
-
-@pytest.fixture
-def message_bus_with_mem_uow(mem_uow):
-    yield _service_layer.get_message_bus(mem_uow)
-
-
 class FakeMessageBus:
     def __init__(self):
         self.messages = []
@@ -54,7 +44,9 @@ class NoCommitSqlAlchemyUoW(_persistence.SqlAlchemyUoW):
 
 @pytest.fixture
 def no_commit_uow():
-    session = _infra.create_session("postgresql://momo:momo@127.0.0.1:5111/tempus_test")
+    session = _infra.create_session(
+        "postgresql://tempus:pgpassword@127.0.0.1:25432/tempus_test"
+    )
     uow = NoCommitSqlAlchemyUoW(session)
     yield uow
     uow.rollback()
@@ -66,3 +58,44 @@ def e2e_client(no_commit_uow):
     _infra.app.dependency_overrides[_infra._get_message_bus] = lambda: message_bus
     yield _testclient.TestClient(_infra.app)
     _infra.app.dependency_overrides = {}
+
+
+class _InMemRepo(_persistence.BaseRepo[_persistence.DomainAggregate]):
+    def __init__(self):
+        super().__init__()
+        self.objects = {}
+
+    def _many(self):
+        yield from self.objects.values()
+
+    def _get(self, id):
+        return self.objects.get(id)
+
+    def _add(self, obj):
+        self.objects[obj.id] = obj
+
+
+class _InMemoryUoW(_persistence.UoW):
+    def __init__(self):
+        self.identities = []
+        self.workers = _InMemRepo()
+        self.projects = _InMemRepo()
+
+    def commit(self):
+        self.raise_transation()
+
+    def rollback(self):
+        self.raise_transation()
+
+    def raise_transation(self):
+        raise RuntimeError("You cannot test transactional behavior with the in-mem uow")
+
+    def get_identity(self):
+        id = _uuid.uuid4()
+        self.identities.append(id)
+        return id
+
+
+@pytest.fixture
+def in_mem_uow():
+    yield _InMemoryUoW()

@@ -1,7 +1,6 @@
 from typing import Type, Generic, TypeVar, Iterable
 import uuid as _uuid
 import abc as _abc
-from tempus.common import interfaces as _interfaces
 from tempus.common import message_bus as _message_bus
 from . import domain as _domain
 
@@ -33,6 +32,11 @@ class BaseRepo(Generic[DomainAggregate]):
         self._seen.append(obj)
         self._add(obj)
 
+    @property
+    def seen_ids(self):
+        for obj in self._seen:
+            yield obj.id
+
     def collect_events(self) -> Iterable[_message_bus.Event]:
         for obj in self._seen:
             if hasattr(obj, "events"):
@@ -61,17 +65,6 @@ class UoW(_abc.ABC):
     workers: BaseRepo[_domain.Worker]
     projects: ProjectRepo
 
-    def __enter__(self):
-        self.begin()
-        return self
-
-    def __exit__(self):
-        self.rollback()
-
-    @_abc.abstractmethod
-    def begin(self):
-        ...
-
     @_abc.abstractmethod
     def commit(self):
         ...
@@ -83,40 +76,21 @@ class UoW(_abc.ABC):
     def get_identity(self) -> _uuid.UUID:
         return _uuid.uuid4()
 
-
-class _InMemRepo(BaseRepo[DomainAggregate]):
-    def __init__(self):
-        super().__init__()
-        self.objects = {}
-
-    def _many(self) -> Iterable[DomainAggregate]:
-        yield from self.objects.values()
-
-    def _get(self, id) -> DomainAggregate:
-        return self.objects.get(id)
-
-    def _add(self, obj: DomainAggregate):
-        self.objects[obj.id] = obj
-
-
-class InMemoryUoW(UoW):
-    def __init__(self):
-        self.workers = _InMemRepo()
-        self.projects = _InMemRepo()
-
-    def begin(self):
-        pass
-
-    def commit(self):
-        pass
-
-    def rollback(self):
-        pass
+    def collect_events(self):
+        for repo in [self.workers, self.projects]:
+            yield from repo.collect_events()
 
 
 import sqlalchemy as _sa
 import sqlalchemy.orm as _orm
 import sqlalchemy.dialects.postgresql as _pg
+
+
+def json_type(*args, **kwargs):
+    # https://amercader.net/blog/beware-of-json-fields-in-sqlalchemy/
+    from sqlalchemy.ext.mutable import MutableDict
+
+    return MutableDict.as_mutable(_pg.JSON())
 
 
 metadata = _sa.MetaData()
@@ -126,7 +100,7 @@ projects = _sa.Table(
     metadata,
     _sa.Column("id", _pg.UUID(as_uuid=True), primary_key=True),
     _sa.Column("name", _sa.String(300), nullable=False),
-    _sa.Column("hourly_rates", _pg.JSON()),
+    _sa.Column("hourly_rates", json_type()),
 )
 
 workers = _sa.Table(
@@ -170,17 +144,18 @@ def start_mappers(engine):
         time_logs,
         properties=dict(worker=_orm.relationship(worker_mapper)),
     )
-    project_mapper = _orm.mapper(
+    _orm.mapper(
         _domain.Project,
         projects,
         properties=dict(_logs=_orm.relationship(time_log_mapper)),
     )
     metadata.create_all(engine)
 
-    @_sa.event.listens_for(_domain.Project, "load")
     def receive_load(project, _):
-        project._events = []
-        project._ensure_hourly_rates_types()
+        project.events = []
+        project.ensure_hourly_rates_types()
+
+    _sa.event.listens_for(_domain.Project, "load")(receive_load)
 
 
 import json as _json
@@ -237,10 +212,6 @@ class SqlAlchemyUoW(UoW):
         self._session = session
         self.projects = SqlProjectRepo(session)
         self.workers = SqlWorkerRepo(session)
-
-    def begin(self):
-        # self._session.begin(subtransactions=True)
-        pass
 
     def commit(self):
         self._session.commit()
