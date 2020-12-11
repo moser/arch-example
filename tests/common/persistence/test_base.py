@@ -1,6 +1,6 @@
 import dataclasses as _dataclasses
 import uuid as _uuid
-from tempus.timemgmt import persistence
+from tempus.common import persistence
 
 
 @_dataclasses.dataclass

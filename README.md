@@ -23,6 +23,12 @@ sleep 5
 docker exec tempus-postgres bash -c 'psql -U tempus -c "CREATE DATABASE tempus_test;"'
 ```
 
+Create .env files
+```
+cp local.env.sample local.env
+cp test.env.sample test.env
+```
+
 Run server on [localhost:8000](http://localhost:8000/timemgmt/docs)
 ```
 uvicorn --reload tempus.main:app

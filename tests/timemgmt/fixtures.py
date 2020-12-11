@@ -4,24 +4,17 @@ import uuid as _uuid
 
 from fastapi import testclient as _testclient
 from tempus.common import message_bus as _message_bus
+from tempus.common import persistence as _common_persistence
+from tempus.common import sqla as _sqla
+from tempus.common import testing_tools as _testing_tools
 from tempus.timemgmt import persistence as _persistence
 from tempus.timemgmt import service_layer as _service_layer
 from tempus.timemgmt import infra as _infra
 
 
-class FakeMessageBus:
-    def __init__(self):
-        self.messages = []
-        self.return_values = {}
-
-    def handle(self, message):
-        self.messages.append(message)
-        return self.return_values.get(message.__class__, None)
-
-
 @pytest.fixture
 def fake_message_bus():
-    yield FakeMessageBus()
+    yield _testing_tools.FakeMessageBus()
 
 
 @pytest.fixture
@@ -42,14 +35,13 @@ class NoCommitSqlAlchemyUoW(_persistence.SqlAlchemyUoW):
         self._session.flush()
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def no_commit_uow():
-    session = _infra.create_session(
-        "postgresql://tempus:pgpassword@127.0.0.1:25432/tempus_test"
-    )
+    session = _infra.get_session()
     uow = NoCommitSqlAlchemyUoW(session)
     yield uow
     uow.rollback()
+    session.close()
 
 
 @pytest.fixture
@@ -60,7 +52,7 @@ def e2e_client(no_commit_uow):
     _infra.app.dependency_overrides = {}
 
 
-class _InMemRepo(_persistence.BaseRepo[_persistence.DomainAggregate]):
+class _InMemRepo(_common_persistence.BaseRepo[_common_persistence.DomainAggregate]):
     def __init__(self):
         super().__init__()
         self.objects = {}
@@ -98,4 +90,5 @@ class _InMemoryUoW(_persistence.UoW):
 
 @pytest.fixture
 def in_mem_uow():
+    # TODO if we make the "repositories" part variable, we can move it to common/lib?!
     yield _InMemoryUoW()

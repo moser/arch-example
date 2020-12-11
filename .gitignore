@@ -4,3 +4,5 @@
 *.swo
 .coverage
 cov_html
+test.env
+local.env
