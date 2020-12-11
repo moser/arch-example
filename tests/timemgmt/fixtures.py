@@ -30,15 +30,10 @@ def fake_message_bus_client(fake_message_bus, current_user):
     _infra.app.dependency_overrides = {}
 
 
-class NoCommitSqlAlchemyUoW(_persistence.SqlAlchemyUoW):
-    def commit(self):
-        self._session.flush()
-
-
 @pytest.fixture(scope="function")
 def no_commit_uow():
     session = _infra.get_session()
-    uow = NoCommitSqlAlchemyUoW(session)
+    uow = _testing_tools.SqlAlchemyNoCommitWrapper(_persistence.SqlAlchemyUoW(session))
     yield uow
     uow.rollback()
     session.close()
