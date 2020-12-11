@@ -339,6 +339,14 @@ version = "20.7"
 pyparsing = ">=2.0.2"
 
 [[package]]
+category = "main"
+description = "parse() is the opposite of format()"
+name = "parse"
+optional = false
+python-versions = "*"
+version = "1.18.0"
+
+[[package]]
 category = "dev"
 description = "A Python Parser"
 name = "parso"
@@ -767,7 +775,7 @@ python-versions = "*"
 version = "1.12.1"
 
 [metadata]
-content-hash = "5ddb5c72f460961f1aa2bca36c5ee210d02bfd20e9eb8934b2f4f920cfd752ba"
+content-hash = "13a7236c2f66167d834191aa5214f37e9967d0a281bca2e45f5e8a348a6bbfd9"
 lock-version = "1.0"
 python-versions = "^3.8"
 
@@ -984,6 +992,9 @@ mypy-extensions = [
 packaging = [
     {file = "packaging-20.7-py2.py3-none-any.whl", hash = "sha256:eb41423378682dadb7166144a4926e443093863024de508ca5c9737d6bc08376"},
     {file = "packaging-20.7.tar.gz", hash = "sha256:05af3bb85d320377db281cf254ab050e1a7ebcbf5410685a9a407e18a1f81236"},
+]
+parse = [
+    {file = "parse-1.18.0.tar.gz", hash = "sha256:91666032d6723dc5905248417ef0dc9e4c51df9526aaeef271eacad6491f06a4"},
 ]
 parso = [
     {file = "parso-0.7.1-py2.py3-none-any.whl", hash = "sha256:97218d9159b2520ff45eb78028ba8b50d2bc61dcc062a9682666f2dc4bd331ea"},

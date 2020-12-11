@@ -5,6 +5,8 @@ import logging.config
 
 import alembic.config
 
+import tempus
+
 
 def env_py_entry_point(appname):
     """
@@ -50,8 +52,7 @@ def env_py_entry_point(appname):
         and associate a connection with the context.
 
         """
-        infra_module = importlib.import_module(f"tempus.{appname}.infra")
-        session = infra_module.get_session()
+        session = tempus.get_app(appname).get_session()
 
         with session.bind.connect() as connection:
             context.configure(connection=connection, target_metadata=target_metadata)
