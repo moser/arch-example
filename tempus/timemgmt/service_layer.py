@@ -1,7 +1,7 @@
-from tempus.common import message_bus as _message_bus
 from . import commands as _commands
 from . import queries as _queries
 from . import domain as _domain
+from . import external_events as _external_events
 
 
 def handle_create_project(uow, command: _commands.CreateProjectCommand):
@@ -29,6 +29,10 @@ def get_projects(uow, query: _queries.GetProjectsQuery):
     return list(uow.projects.many())
 
 
+def publish_external_event(uow, event: _domain.TimeLogCreated):
+    uow.publish(_external_events.TimeLogCreated(payload="aaa"))
+
+
 def add_handlers(message_bus):
     message_bus.register_command_handler(
         _commands.AddTimeLogCommand, handle_add_time_log
@@ -38,3 +42,4 @@ def add_handlers(message_bus):
     )
 
     message_bus.register_query_handler(_queries.GetProjectsQuery, get_projects)
+    message_bus.register_event_handler(_domain.TimeLogCreated, publish_external_event)
