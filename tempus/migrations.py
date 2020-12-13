@@ -90,9 +90,15 @@ def main(argv=None, **kwargs):
 
     logging.config.fileConfig("migrations/logging.ini")
 
+    migratable_apps = [
+        appname
+        for appname, the_app in tempus.apps.get_all_apps()
+        if the_app.has_migrations
+    ]
+
     if len(sys.argv) < 2:
         PatchedCommandLine(
-            appname="{%s}" % (",".join(["_all_"] + sorted(tempus.apps.APP_NAMES)))
+            appname="{%s}" % (",".join(["_all_"] + sorted(migratable_apps)))
         ).main(argv=[])
         return
 
@@ -100,7 +106,7 @@ def main(argv=None, **kwargs):
     argv = sys.argv[2:]
     if appname == "_all_":
         console_log_handler = logging.root.handlers[0]
-        for appname in tempus.apps.APP_NAMES:
+        for appname in migratable_apps:
             console_log_handler.setFormatter(
                 logging.Formatter(f"{appname} %(levelname)s [%(name)s] %(message)s")
             )

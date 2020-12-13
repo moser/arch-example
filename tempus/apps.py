@@ -1,6 +1,6 @@
 import importlib
 
-APP_NAMES = ["timemgmt", "workforce"]
+APP_NAMES = ["timemgmt", "prototype_example"]
 
 
 def get_app(appname):

@@ -59,6 +59,10 @@ class TheApp:
         self._dep_overrides = {}
         self.deps = Deps(self)
 
+    @property
+    def has_migrations(self):
+        return self.sqla_metadata is not None
+
     def override_env_file(self, env_file):
         self._env_file_override = env_file
 
