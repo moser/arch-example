@@ -33,12 +33,27 @@ class Deps:
 
 
 class TheApp:
-    def __init__(self, appname: str, settings_cls, sqla_uow_factory, setup_handlers):
+    def __init__(
+        self,
+        appname: str,
+        settings_cls,
+        setup_handlers,
+        uow_factory=None,
+        sqla_uow_factory=None,
+        sqla_metadata=None,
+        uow_type=None,
+    ):
         self.fastapi = _fastapi.FastAPI()
+        self.sqla_metadata = sqla_metadata
 
         self._settings_cls = settings_cls
+        self._uow_factory = uow_factory
         self._sqla_uow_factory = sqla_uow_factory
+        assert not (uow_factory and sqla_uow_factory) and any(
+            [uow_factory, sqla_uow_factory]
+        )
         self._setup_handlers = setup_handlers
+        self._uow_type = uow_type
 
         self._env_file_override = None
         self._dep_overrides = {}
@@ -62,7 +77,7 @@ class TheApp:
 
     @overridable
     def get_user(self):
-        return User(_uuid.UUID("8e8c9ca0-3100-48a6-9087-a3ce987f02ed"))
+        return _user.User(_uuid.UUID("8e8c9ca0-3100-48a6-9087-a3ce987f02ed"))
 
     @overridable
     def get_session(self):
@@ -70,7 +85,13 @@ class TheApp:
 
     @overridable
     def get_uow(self):
-        return self._sqla_uow_factory(self.get_session())
+        if self._sqla_uow_factory is not None:
+            uow = self._sqla_uow_factory(self.get_session())
+        else:
+            uow = self._uow_factory()
+        if self._uow_type is not None:
+            assert isinstance(uow, self._uow_type)
+        return uow
 
     @overridable
     def get_message_bus(self):

@@ -1,11 +1,10 @@
 import sys
-import importlib
 import logging
 import logging.config
 
 import alembic.config
 
-import tempus
+import tempus.apps
 
 
 def env_py_entry_point(appname):
@@ -13,14 +12,10 @@ def env_py_entry_point(appname):
     For each app, place a `env.py` that imports this file and calls it with
     its appname.
     """
-    from sqlalchemy import engine_from_config
-    from sqlalchemy import pool
-
     from alembic import context
 
+    the_app = tempus.apps.get_app(appname)
     config = context.config
-    orm_module = importlib.import_module(f"tempus.{appname}.persistence.orm")
-    target_metadata = orm_module.metadata
 
     def run_migrations_offline():
         """Run migrations in 'offline' mode.
@@ -37,7 +32,7 @@ def env_py_entry_point(appname):
         url = config.get_main_option("sqlalchemy.url")
         context.configure(
             url=url,
-            target_metadata=target_metadata,
+            target_metadata=the_app.sqla_metadata,
             literal_binds=True,
             dialect_opts={"paramstyle": "named"},
         )
@@ -52,10 +47,12 @@ def env_py_entry_point(appname):
         and associate a connection with the context.
 
         """
-        session = tempus.get_app(appname).get_session()
+        session = the_app.get_session()
 
         with session.bind.connect() as connection:
-            context.configure(connection=connection, target_metadata=target_metadata)
+            context.configure(
+                connection=connection, target_metadata=the_app.sqla_metadata
+            )
 
             with context.begin_transaction():
                 context.run_migrations()
@@ -74,16 +71,18 @@ class PatchedCommandLine(alembic.config.CommandLine):
 
     def main(self, argv=None):
         options = self.parser.parse_args(argv)
-        cfg = alembic.config.Config(
-            file_=options.config,
-            ini_section=options.name,
-            cmd_opts=options,
-        )
-        cfg.set_main_option("script_location", f"migrations/{self.appname}")
-        self.run_cmd(cfg, options)
-
-
-APPS = ["timemgmt"]
+        if not hasattr(options, "cmd"):
+            # see http://bugs.python.org/issue9253, argparse
+            # behavior changed incompatibly in py3.3
+            self.parser.error("too few arguments")
+        else:
+            cfg = alembic.config.Config(
+                file_=options.config,
+                ini_section=options.name,
+                cmd_opts=options,
+            )
+            cfg.set_main_option("script_location", f"migrations/{self.appname}")
+            self.run_cmd(cfg, options)
 
 
 def main(argv=None, **kwargs):
@@ -92,16 +91,16 @@ def main(argv=None, **kwargs):
     logging.config.fileConfig("migrations/logging.ini")
 
     if len(sys.argv) < 2:
-        PatchedCommandLine(appname="{%s}" % (",".join(["_all_"] + sorted(APPS)))).main(
-            argv=[]
-        )
+        PatchedCommandLine(
+            appname="{%s}" % (",".join(["_all_"] + sorted(tempus.apps.APP_NAMES)))
+        ).main(argv=[])
         return
 
     appname = sys.argv[1]
     argv = sys.argv[2:]
     if appname == "_all_":
         console_log_handler = logging.root.handlers[0]
-        for appname in APPS:
+        for appname in tempus.apps.APP_NAMES:
             console_log_handler.setFormatter(
                 logging.Formatter(f"{appname} %(levelname)s [%(name)s] %(message)s")
             )
@@ -109,7 +108,7 @@ def main(argv=None, **kwargs):
             print(appname)
             PatchedCommandLine(appname=appname).main(argv=argv)
     else:
-        assert appname in APPS, "Unknown app"
+        assert appname in tempus.apps.APP_NAMES, "Unknown app"
         PatchedCommandLine(appname=appname).main(argv=argv)
 
 

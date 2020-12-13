@@ -1,8 +1,7 @@
-import importlib
-import fastapi
+import fastapi as _fastapi
+from . import apps
 
-app = fastapi.FastAPI()
+app = _fastapi.FastAPI()
 
-for modname in ["timemgmt"]:
-    mod = importlib.import_module(f"tempus.{modname}")
-    app.mount(f"/{modname}", mod.the_app.fastapi)
+for appname, the_app in apps.get_all_apps():
+    app.mount(f"/{appname}", the_app.fastapi)

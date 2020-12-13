@@ -1,4 +1,5 @@
 from typing import Type, Generic, TypeVar, Iterable, List
+import abc as _abc
 import uuid as _uuid
 from tempus.common import message_bus as _message_bus
 
@@ -52,8 +53,16 @@ class BaseRepo(Generic[DomainAggregate]):
         raise NotImplementedError
 
 
-class BaseUoW:
+class BaseUoW(_abc.ABC):
     repositories: List[BaseRepo]
+
+    @_abc.abstractmethod
+    def commit(self):
+        raise NotImplementedError
+
+    @_abc.abstractmethod
+    def rollback(self):
+        raise NotImplementedError
 
     def get_identity(self) -> _uuid.UUID:
         return _uuid.uuid4()
@@ -61,6 +70,10 @@ class BaseUoW:
     def collect_events(self):
         for repo in self.repositories:
             yield from repo.collect_events()
+
+    @_abc.abstractmethod
+    def publish(self, external_event):
+        raise NotImplementedError
 
 
 class SqlRepo(BaseRepo[DomainAggregate]):
@@ -80,13 +93,24 @@ class SqlRepo(BaseRepo[DomainAggregate]):
         self.session.add(obj)
 
 
-class BaseSqlAlchemyUoW:
-    def __init__(self, session):
+class SqlAlchemyUoW(BaseUoW):
+    def __init__(self, session, start_mappers, **repos):
         super().__init__()
         self._session = session
+        self._repos = repos
+        for reponame, repo in repos.items():
+            setattr(self, reponame, repo)
+        start_mappers(session.connection().engine)
 
     def commit(self):
         self._session.commit()
 
     def rollback(self):
         self._session.rollback()
+
+    @property
+    def repositories(self):
+        return list(self._repos.values())
+
+    def publish(self, external_event):
+        raise NotImplementedError

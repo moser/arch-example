@@ -16,6 +16,8 @@ class Settings(_pydantic.BaseSettings):
 the_app = _the_app.TheApp(
     "timemgmt",
     settings_cls=Settings,
-    sqla_uow_factory=_persistence.SqlAlchemyUoW,
+    sqla_metadata=_persistence.sqla_metadata,
+    sqla_uow_factory=_persistence.sqla_uow_factory,
+    uow_type=_persistence.UoW,
     setup_handlers=_service_layer.add_handlers,
 )
