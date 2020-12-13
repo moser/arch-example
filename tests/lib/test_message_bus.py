@@ -4,7 +4,7 @@ import dataclasses as _dataclasses
 
 import pytest
 
-from tempus.common import message_bus
+from tempus.lib import message_bus
 
 
 class FakeUoW:

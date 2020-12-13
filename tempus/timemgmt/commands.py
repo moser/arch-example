@@ -2,7 +2,7 @@ from typing import Dict
 import uuid as _uuid
 import dataclasses as _dataclasses
 import datetime as _dt
-from tempus.common import message_bus as _message_bus
+from tempus.lib import message_bus as _message_bus
 
 
 @_dataclasses.dataclass

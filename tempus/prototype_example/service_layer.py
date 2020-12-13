@@ -1,4 +1,4 @@
-from tempus.common import message_bus as _message_bus
+from tempus.lib import message_bus as _message_bus
 from . import queries as _queries
 from . import commands as _commands
 from . import domain as _domain

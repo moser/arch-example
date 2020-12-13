@@ -6,7 +6,7 @@ import enum as _enum
 
 import pydantic as _pydantic
 
-from tempus.common import message_bus as _message_bus
+from tempus.lib import message_bus as _message_bus
 
 
 class Level(_enum.Enum):

@@ -1,5 +1,5 @@
 import pydantic as _pydantic
-from tempus.common import the_app as _the_app
+from tempus.lib import the_app as _the_app
 from . import service_layer as _service_layer
 
 

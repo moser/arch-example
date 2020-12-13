@@ -2,7 +2,7 @@ import sqlalchemy as _sa
 import sqlalchemy.dialects.postgresql as _pg
 import sqlalchemy.orm as _orm
 
-from tempus.common import sqla_json as _sqla_json
+from tempus.lib import sqla_json as _sqla_json
 from tempus.timemgmt import domain as _domain
 
 

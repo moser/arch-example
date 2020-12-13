@@ -1,7 +1,7 @@
-from typing import Type, Generic, TypeVar, Iterable, List
+from typing import Generic, TypeVar, Iterable, List
 import abc as _abc
 import uuid as _uuid
-from tempus.common import message_bus as _message_bus
+from tempus.lib import message_bus as _message_bus
 
 
 DomainAggregate = TypeVar("DomainAggregate")
@@ -72,45 +72,5 @@ class BaseUoW(_abc.ABC):
             yield from repo.collect_events()
 
     @_abc.abstractmethod
-    def publish(self, external_event):
-        raise NotImplementedError
-
-
-class SqlRepo(BaseRepo[DomainAggregate]):
-    aggregate_class: Type[DomainAggregate]
-
-    def __init__(self, session):
-        super().__init__()
-        self.session = session
-
-    def _many(self):
-        return self.session.query(self.aggregate_class).all()
-
-    def _get(self, id):
-        return self.session.query(self.aggregate_class).get(id)
-
-    def _add(self, obj):
-        self.session.add(obj)
-
-
-class SqlAlchemyUoW(BaseUoW):
-    def __init__(self, session, start_mappers, **repos):
-        super().__init__()
-        self._session = session
-        self._repos = repos
-        for reponame, repo in repos.items():
-            setattr(self, reponame, repo)
-        start_mappers(session.connection().engine)
-
-    def commit(self):
-        self._session.commit()
-
-    def rollback(self):
-        self._session.rollback()
-
-    @property
-    def repositories(self):
-        return list(self._repos.values())
-
     def publish(self, external_event):
         raise NotImplementedError

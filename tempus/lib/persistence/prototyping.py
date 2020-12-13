@@ -1,10 +1,10 @@
 from typing import List
 import pickle as _pickle
 import pathlib as _pathlib
-from tempus.common.persistence import BaseRepo, BaseUoW, DomainAggregate
+from . import base as _base
 
 
-class _PrototypingRepo(BaseRepo[DomainAggregate]):
+class _PrototypingRepo(_base.BaseRepo[_base.DomainAggregate]):
     def __init__(self, reponame):
         super().__init__()
         self._objects = {}
@@ -30,7 +30,7 @@ class _PrototypingRepo(BaseRepo[DomainAggregate]):
             self._objects = {}
 
 
-class PrototypingUoW(BaseUoW):
+class PrototypingUoW(_base.BaseUoW):
     def __init__(self, reponames: List[str]):
         super().__init__()
         self._repos = {}

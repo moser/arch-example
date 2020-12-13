@@ -1,5 +1,5 @@
 import pytest
-from tempus.common import message_bus as _message_bus
+from tempus.lib import message_bus as _message_bus
 from tempus.timemgmt import service_layer
 from tempus.timemgmt import commands
 from tempus.timemgmt import queries

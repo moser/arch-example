@@ -2,7 +2,7 @@ import uuid as _uuid
 import pytest
 
 from fastapi import testclient as _testclient
-from tempus.common import testing_tools as _testing_tools
+from tempus.lib import testing_tools as _testing_tools
 from tempus.timemgmt import infra as _infra
 
 

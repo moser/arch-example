@@ -1,5 +1,5 @@
 import enum
-from tempus.common import sqla_json
+from tempus.lib import sqla_json
 
 
 class Foo:
