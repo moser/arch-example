@@ -45,12 +45,12 @@ class MyCommand(message_bus.Command):
     payload: str
 
 
-def upper_payload(uow, command: MyCommand):
+def upper_payload(command: MyCommand, uow):
     del uow
     return command.payload.upper()
 
 
-def raise_runtimeerror(*_):
+def raise_runtimeerror(*_, **__):
     raise RuntimeError
 
 
@@ -83,14 +83,14 @@ def test_handle_command_args(subject, fake_uow):
     subject.register_command_handler(MyCommand, handler)
     cmd = MyCommand("foo")
     subject.handle(cmd)
-    handler.assert_called_with(fake_uow, cmd)
+    handler.assert_called_with(cmd, uow=fake_uow)
 
 
 class MyQuery(message_bus.Query):
     pass
 
 
-def respond_to_query(uow, query: MyQuery):
+def respond_to_query(query: MyQuery, uow):
     del uow, query
     return ["a", "b"]
 
@@ -117,7 +117,7 @@ def test_handle_query_args(subject, fake_uow):
     subject.register_query_handler(MyQuery, handler)
     qry = MyQuery()
     subject.handle(qry)
-    handler.assert_called_with(fake_uow, qry)
+    handler.assert_called_with(qry, uow=fake_uow)
 
 
 def test_handle_query_failure(subject, fake_uow):
@@ -146,8 +146,8 @@ def test_handle_event(subject, fake_uow):
     event = MyEvent(payload="a")
     result = subject.handle(event)
     assert result is None
-    handle_event1.assert_called_with(fake_uow, event)
-    handle_event2.assert_called_with(fake_uow, event)
+    handle_event1.assert_called_with(event, uow=fake_uow)
+    handle_event2.assert_called_with(event, uow=fake_uow)
 
 
 def test_handle_event_raise(subject, fake_uow):
@@ -157,7 +157,7 @@ def test_handle_event_raise(subject, fake_uow):
     event = MyEvent(payload="a")
     result = subject.handle(event)
     assert result is None
-    handle_event.assert_called_with(fake_uow, event)
+    handle_event.assert_called_with(event, uow=fake_uow)
 
 
 @_dataclasses.dataclass
@@ -168,7 +168,7 @@ class CountingEvent(message_bus.Event):
 def test_event_cycle(subject):
     observed_events = []
 
-    def event_handler1(uow, event):
+    def event_handler1(event, uow):
         if event.idx < 5:
             uow.raise_event(CountingEvent(event.idx + 1))
         observed_events.append(event)
@@ -176,3 +176,42 @@ def test_event_cycle(subject):
     subject.register_event_handler(CountingEvent, event_handler1)
     subject.handle(CountingEvent(0))
     assert len(observed_events) == 6
+
+
+def test_dependency_request():
+    @message_bus.request_dependency("a")
+    @message_bus.request_dependency("b")
+    def handler():
+        pass
+
+    assert handler.tempus_dependency_requests == ("a", "b")
+
+
+def test_get_dependency():
+    dep_a = mock.Mock()
+    dep_a.return_value = 1
+    handler = mock.Mock(tempus_dependency_requests=("dep_a",))
+    subject = message_bus.MessageBus(uow=None, dependencies=dict(dep_a=dep_a))
+
+    assert subject.get_dependencies(handler) == dict(dep_a=1)
+
+
+def test_resolve_dependencies():
+    dep_a = mock.Mock()
+    dep_a.return_value = 4
+    handler = mock.Mock(tempus_dependency_requests=("dep_a",))
+    subject = message_bus.MessageBus(uow=None, dependencies=dict(dep_a=dep_a))
+
+    subject.resolve_dependencies(handler)(1, 2, uow=3)
+    handler.assert_called_with(1, 2, uow=3, dep_a=4)
+
+
+def test_dependency_resolution(fake_uow):
+    dep_a = mock.Mock()
+    dep_a.return_value = 4
+    handler = mock.Mock(tempus_dependency_requests=("dep_a",))
+    subject = message_bus.MessageBus(uow=fake_uow, dependencies=dict(dep_a=dep_a))
+    subject.register_event_handler(MyEvent, handler)
+    evt = MyEvent("a")
+    subject.handle(evt)
+    handler.assert_called_with(evt, uow=fake_uow, dep_a=4)

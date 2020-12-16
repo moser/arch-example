@@ -20,7 +20,7 @@ docker run -d \
     -p 25432:5432 \
     postgres
 sleep 5
-docker exec tempus-postgres bash -c 'psql -U tempus -c "CREATE DATABASE tempus_test;"'
+docker exec tempus-postgres bash -c 'psql -U tempus -c "CREATE DATABASE tempus_django;"'
 ```
 
 Create .env files

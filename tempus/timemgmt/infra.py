@@ -13,6 +13,12 @@ class Settings(_pydantic.BaseSettings):
     testing: bool = False
 
 
+def get_legacy_django_app():
+    from legacy.something import entrypoints
+
+    return entrypoints.SomeQueryInterface()
+
+
 the_app = _the_app.TheApp(
     "timemgmt",
     settings_cls=Settings,
@@ -20,4 +26,5 @@ the_app = _the_app.TheApp(
     sqla_uow_factory=_persistence.sqla_uow_factory,
     uow_type=_persistence.UoW,
     setup_handlers=_service_layer.add_handlers,
+    other_dependencies=dict(legacy_django_app=get_legacy_django_app),
 )

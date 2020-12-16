@@ -1,10 +1,12 @@
 from typing import (
+    Iterable,
     Type,
     TypeVar,
     Any,
     Callable,
     Dict,
     List,
+    Optional,
 )
 import collections as _collections
 import logging as _logging
@@ -34,28 +36,29 @@ _EvtT = TypeVar("_EvtT", bound="Event")
 
 
 class MessageBus:
-    _command_handlers: Dict[Type[_CmdT], Callable[[Any, _CmdT], Any]]
-    _query_handlers: Dict[Type[_QryT], Callable[[Any, _QryT], Any]]
-    _event_handlers: Dict[Type[_EvtT], List[Callable[[Any, _EvtT], None]]]
+    _command_handlers: Dict[Type[_CmdT], Callable[[_CmdT], Any]]
+    _query_handlers: Dict[Type[_QryT], Callable[[_QryT], Any]]
+    _event_handlers: Dict[Type[_EvtT], List[Callable[[_EvtT], None]]]
 
-    def __init__(self, uow):
+    def __init__(self, uow, dependencies: Optional[Dict[str, Callable]] = None):
         self._command_handlers = {}
         self._query_handlers = {}
         self._event_handlers = _collections.defaultdict(list)
         self._uow = uow
+        self._dependencies = dependencies or {}
 
     def register_command_handler(
-        self, command_type: Type[_CmdT], handler: Callable[[Any, _CmdT], Any]
+        self, command_type: Type[_CmdT], handler: Callable[[_CmdT], Any]
     ):
         self._command_handlers[command_type] = handler
 
     def register_query_handler(
-        self, query_type: Type[_QryT], handler: Callable[[Any, _QryT], Any]
+        self, query_type: Type[_QryT], handler: Callable[[_QryT], Any]
     ):
         self._query_handlers[query_type] = handler
 
     def register_event_handler(
-        self, event_type: Type[_EvtT], handler: Callable[[Any, _EvtT], None]
+        self, event_type: Type[_EvtT], handler: Callable[[_EvtT], None]
     ):
         self._event_handlers[event_type].append(handler)
 
@@ -84,7 +87,7 @@ class MessageBus:
         handler = _find_handler(command, self._command_handlers)
 
         try:
-            result = handler(self._uow, command)
+            result = self._call_with_resolved_deps(handler, command, uow=self._uow)
             self._uow.commit()
         except Exception:
             self._uow.rollback()
@@ -95,7 +98,7 @@ class MessageBus:
         handler = _find_handler(query, self._query_handlers)
 
         try:
-            return handler(self._uow, query)
+            return self._call_with_resolved_deps(handler, query, uow=self._uow)
         finally:
             self._uow.rollback()
 
@@ -105,13 +108,47 @@ class MessageBus:
             logger.error("No handlers for event %r", event)
         for handler in handlers:
             try:
-                handler(self._uow, event)
+                self._call_with_resolved_deps(handler, event, uow=self._uow)
                 self._uow.commit()
             except Exception:
                 self._uow.rollback()
                 logger.error(
                     "Hander %r railed to handle event %r", handler, event, exc_info=True
                 )
+
+    def _call_with_resolved_deps(self, fn, *args, **kwargs):
+        return self.resolve_dependencies(fn)(*args, **kwargs)
+
+    def resolve_dependencies(self, fn) -> Callable:
+        deps = self.get_dependencies(fn)
+
+        def _inner(*args, **kwargs):
+            kwargs.update(deps)
+            return fn(*args, **kwargs)
+
+        return _inner
+
+    def get_dependencies(self, fn) -> Dict[str, Any]:
+        if hasattr(fn, "tempus_dependency_requests") and isinstance(
+            getattr(fn, "tempus_dependency_requests"), Iterable
+        ):
+            return {
+                key: self._dependencies[key]()
+                for key in getattr(fn, "tempus_dependency_requests")
+            }
+        return {}
+
+
+def request_dependency(depname):
+    def _inner(fn):
+        if not hasattr(fn, "tempus_dependency_requests"):
+            fn.tempus_dependency_requests = ()
+        fn.tempus_dependency_requests = tuple(
+            [depname] + list(fn.tempus_dependency_requests)
+        )
+        return fn
+
+    return _inner
 
 
 def _find_handler(msg: _Message, mapping: dict):

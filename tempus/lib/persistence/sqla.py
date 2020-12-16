@@ -37,6 +37,3 @@ class SqlAlchemyUoW(_base.BaseUoW):
     @property
     def repositories(self):
         return list(self._repos.values())
-
-    def publish(self, external_event):
-        raise NotImplementedError

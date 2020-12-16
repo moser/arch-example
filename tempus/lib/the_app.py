@@ -1,3 +1,4 @@
+from typing import Dict, Optional, Callable
 import uuid as _uuid
 import contextlib
 import functools
@@ -38,6 +39,7 @@ class TheApp:
         sqla_uow_factory=None,
         sqla_metadata=None,
         uow_type=None,
+        other_dependencies: Optional[Dict[str, Callable]] = None,
     ):
         self.fastapi = _fastapi.FastAPI()
         self.sqla_metadata = sqla_metadata
@@ -53,6 +55,7 @@ class TheApp:
 
         self._env_file_override = None
         self._dep_overrides = {}
+        self._other_dependencies = other_dependencies or {}
         self.deps = Deps(self)
 
     @property
@@ -96,6 +99,12 @@ class TheApp:
     @overridable
     def get_message_bus(self):
         uow = self.get_uow()
-        message_bus = _message_bus.MessageBus(uow=uow)
+        message_bus = _message_bus.MessageBus(
+            uow=uow, dependencies=self.get_other_dependencies()
+        )
         self._setup_handlers(message_bus)
         return message_bus
+
+    def get_other_dependencies(self):
+        # TODO make overridable
+        return self._other_dependencies
