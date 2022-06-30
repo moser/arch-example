@@ -29,6 +29,14 @@ cp local.env.sample local.env
 cp test.env.sample test.env
 ```
 
+Run migrations
+```
+# legacy django app
+python manage-django.py migrate
+# tempus part
+python -m tempus.migrations _all_ upgrade head
+```
+
 Run server on [localhost:8000](http://localhost:8000/timemgmt/docs)
 ```
 uvicorn --reload tempus.main:app
