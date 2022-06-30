@@ -67,6 +67,7 @@ class MessageBus:
         if isinstance(msg, Command):
             result = self.handle_command(msg)
         elif isinstance(msg, Query):
+            # TODO move this out (and ensure that query handling must not publish events)
             result = self.handle_query(msg)
         elif isinstance(msg, Event):
             self.handle_event(msg)

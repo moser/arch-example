@@ -70,3 +70,7 @@ class BaseUoW(_abc.ABC):
     def collect_events(self):
         for repo in self.repositories:
             yield from repo.collect_events()
+
+    @_abc.abstractmethod
+    def publish(self, event):
+        raise NotImplementedError
