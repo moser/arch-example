@@ -39,4 +39,11 @@ class SqlAlchemyUoW(_base.BaseUoW):
         return list(self._repos.values())
 
     def publish(self, event):
-        raise
+        # Idea
+        # - add redis
+        # - publish events on a redis pub/sub
+
+        # For consumption
+        # - add an entry point that defines which events an app is interested in
+        # - run another process that subscribes to events and hands them to the concerned event entry points (like FastAPI does for our http entry points)
+        raise NotImplementedError("This needs to be implemented :-)")
